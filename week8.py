@@ -1,57 +1,128 @@
-def unify(expr1, expr2):
-    # Split expressions into function and arguments
-    func1, args1 = expr1.split('(', 1)
-    func2, args2 = expr2.split('(', 1)
+import re
 
-    # Check if functions are the same
-    if func1 != func2:
-        print("Expressions cannot be unified. Different functions.")
-        return None
+def getAttributes(expression):
+    expression = expression.split("(")[1:]
+    expression = "(".join(expression)
+    expression = expression[:-1]
+    expression = re.split("(?<!\(.),(?!.\))", expression)
+    return expression
+def getInitialPredicate(expression):
+    return expression.split("(")[0]
 
-    args1 = args1.rstrip(')').split(',')
-    args2 = args2.rstrip(')').split(',')
+def isConstant(char):
+    return char.isupper() and len(char) == 1
 
-    substitution = {}
-   
-    # Unify arguments
-    for a1, a2 in zip(args1, args2):
-        if a1.islower() and a2.islower() and a1 != a2:
-            substitution[a1] = a2
-        elif a1.islower() and not a2.islower():
-            substitution[a1] = a2
-        elif not a1.islower() and a2.islower():
-            substitution[a2] = a1
-        elif a1 != a2:
-            print("Expressions cannot be unified. Incompatible arguments.")
-            return None
+def isVariable(char):
+    return char.islower() and len(char) == 1
 
-    return substitution
+def replaceAttributes(exp, old, new):
+    attributes = getAttributes(exp)
+    for index, val in enumerate(attributes):
+        if val == old:
+            attributes[index] = new
+    predicate = getInitialPredicate(exp)
+    return predicate + "(" + ",".join(attributes) + ")"
+
+def apply(exp, substitutions):
+    for substitution in substitutions:
+        new, old = substitution
+        exp = replaceAttributes(exp, old, new)
+    return exp
+def checkOccurs(var, exp):
+    if exp.find(var) == -1:
+        return False
+    return True
 
 
-def apply_substitution(expr, substitution):
-    for key, value in substitution.items():
-        expr = expr.replace(key, value)
-    return expr
+def getFirstPart(expression):
+    attributes = getAttributes(expression)
+    return attributes[0]
 
 
-# Main program
-if __name__ == "__main__":
-    # Sample input
-    expr1 = input("Enter the first expression: ")
-    expr2 = input("Enter the second expression: ")
+def getRemainingPart(expression):
+    predicate = getInitialPredicate(expression)
+    attributes = getAttributes(expression)
+    newExpression = predicate + "(" + ",".join(attributes[1:]) + ")"
+    return newExpression
+def unify(exp1, exp2):
+    if exp1 == exp2:
+        return []
 
-    # Unify expressions
-    substitution = unify(expr1, expr2)
+    if isConstant(exp1) and isConstant(exp2):
+        if exp1 != exp2:
+            return False
 
-    # Display result
-    if substitution:
-        print("The substitutions are:")
-        for key, value in substitution.items():
-            print(f'{key} / {value}')
+    if isConstant(exp1):
+        return [(exp1, exp2)]
 
-        # Apply substitution to original expressions
-        expr1_result = apply_substitution(expr1, substitution)
-        expr2_result = apply_substitution(expr2, substitution)
+    if isConstant(exp2):
+        return [(exp2, exp1)]
 
-        print(f'Unified expression 1: {expr1_result}')
-        print(f'Unified expression 2: {expr2_result}'
+    if isVariable(exp1):
+        if checkOccurs(exp1, exp2):
+            return False
+        else:
+            return [(exp2, exp1)]
+
+    if isVariable(exp2):
+        if checkOccurs(exp2, exp1):
+            return False
+        else:
+            return [(exp1, exp2)]
+
+    if getInitialPredicate(exp1) != getInitialPredicate(exp2):
+        print("Predicates do not match. Cannot be unified")
+        return False
+
+    attributeCount1 = len(getAttributes(exp1))
+    attributeCount2 = len(getAttributes(exp2))
+    if attributeCount1 != attributeCount2:
+        return False
+
+    head1 = getFirstPart(exp1)
+    head2 = getFirstPart(exp2)
+    initialSubstitution = unify(head1, head2)
+    if not initialSubstitution:
+        return False
+    if attributeCount1 == 1:
+        return initialSubstitution
+
+    tail1 = getRemainingPart(exp1)
+    tail2 = getRemainingPart(exp2)
+
+    if initialSubstitution != []:
+        tail1 = apply(tail1, initialSubstitution)
+        tail2 = apply(tail2, initialSubstitution)
+
+    remainingSubstitution = unify(tail1, tail2)
+    if not remainingSubstitution:
+        return False
+
+    initialSubstitution.extend(remainingSubstitution)
+    return initialSubstitution
+
+# exp1 = "knows(A,x)"
+# exp2 = "knows(y,Y)"
+exp1 = "knows(f(x),y)"
+exp2 = "knows(J,John)"
+substitutions = unify(exp1, exp2)
+print("Substitutions:")
+print(substitutions)
+
+exp1 = "Student(x)"
+exp2 = "Teacher(y)"
+substitutions = unify(exp1, exp2)
+print("Substitutions:")
+print(substitutions)
+
+exp1 = "knows(John,x)"
+exp2 = "knows(y,Mother(y))"
+substitutions = unify(exp1, exp2)
+print("Substitutions:")
+print(substitutions)
+
+exp1 = "like(A,y)"
+exp2 = "like(K,g(x))"
+substitutions = unify(exp1, exp2)
+print("Substitutions:")
+print(substitutions)
